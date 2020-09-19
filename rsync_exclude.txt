@@ -1,0 +1,6 @@
+- bolt.db
+- build
+- temp
+- .idea
+- vendor/*
++ *
