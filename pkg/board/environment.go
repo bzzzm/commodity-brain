@@ -16,21 +16,23 @@ const (
 	PressureKey    = "env_press"
 )
 
-func (b CommodityBoard) SyncEnv(t time.Duration) {
-	buf := make([]byte, EnvDataLen)
-	tick := time.Tick(t)
+func (b CommodityBoard) SyncEnv() {
 
 	var err error
 	var temperature, pressure, humidity float32
 	var start time.Time
 
-	zap.S().Debugf("SyncEnv started")
+	buf := make([]byte, EnvDataLen)
+	tick := time.Tick(b.config.Update.Env)
+
+	zap.S().Debugf("SyncEnv started with update rate: %v", b.config.Update.Env)
 
 	for {
 		select {
 		case <-tick:
 
-			// read from i2c
+			// read from i2c using the mutex lock and
+			// start the timer only after the lock was aquired
 			b.mux.Lock()
 
 			start = time.Now()
@@ -47,7 +49,7 @@ func (b CommodityBoard) SyncEnv(t time.Duration) {
 			pressure = utils.Float32FromBytes(buf[4:8])
 			humidity = utils.Float32FromBytes(buf[8:])
 
-			// update db
+			// update db (ignore humidity, chip is not capable to measure it)
 			err = b.db.Update(func(tx *bbolt.Tx) error {
 				bucket := tx.Bucket([]byte(db.BoardBucket))
 				err = bucket.Put([]byte(TemperatureKey), buf[0:4])
@@ -66,6 +68,8 @@ func (b CommodityBoard) SyncEnv(t time.Duration) {
 				b.ec <- err
 				continue
 			}
+
+			// log.debug the result
 			zap.S().Debugf("SyncEnv finished in %v - %v C; %v ??; %v %%", time.Now().Sub(start), temperature, pressure, humidity)
 
 		case <-b.ctx.Done():

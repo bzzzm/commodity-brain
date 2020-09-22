@@ -13,7 +13,7 @@ const (
 	BlueLed    = 2
 )
 
-func (b CommodityBoard) SwitchLed(led int) error {
+func (b *CommodityBoard) SwitchLed(led int) error {
 	var err error
 	var start time.Time
 	buf := make([]byte, LedDataLen)
@@ -27,7 +27,14 @@ func (b CommodityBoard) SwitchLed(led int) error {
 		return err
 	}
 
-	// switch the led
+	// error correction
+	for i, s := range buf {
+		if s > 1 {
+			buf[i] = 1
+		}
+	}
+
+	// switch the led in buffer
 	if buf[led] == 0 {
 		buf[led] = 1
 	} else {

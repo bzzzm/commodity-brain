@@ -2,65 +2,71 @@ package board
 
 import (
 	"context"
+	"github.com/bzzzm/commodity-brain/pkg/utils"
 	"go.etcd.io/bbolt"
 	"go.uber.org/zap"
 	"periph.io/x/periph/conn/i2c"
 	"periph.io/x/periph/conn/i2c/i2creg"
-	"periph.io/x/periph/conn/physic"
 	"sync"
 	"time"
 )
 
-const (
-	bufferSize = 32
-	I2CAddr    = 0x20
-	I2CBus     = "1"
-	I2CSpeed   = 400 * physic.KiloHertz
-)
-
 type CommodityBoard struct {
-	db  *bbolt.DB
-	mux *sync.Mutex
-
 	Bus i2c.BusCloser
 	Dev *i2c.Dev
 
-	ctx context.Context
-	ec  chan error
+	ctx    context.Context
+	ec     chan error
+	db     *bbolt.DB
+	mux    *sync.Mutex
+	config *utils.BoardConfig
+	fake   bool
 }
 
 // NewI2CBoard creates a new Commodity Board instance that is able to communicate over I2C
-func NewBoard(ctx context.Context, db *bbolt.DB, ec chan error) (*CommodityBoard, error) {
+func NewBoard(ctx context.Context, config *utils.BoardConfig, db *bbolt.DB, fake bool, ec chan error) (*CommodityBoard, error) {
 
-	// open I2C bus+device
-	b, err := i2creg.Open(I2CBus)
-	if err != nil {
-		return nil, err
-	}
-
-	d := &i2c.Dev{Addr: uint16(I2CAddr), Bus: b}
-
-	// t3h board
+	// create the standard board
 	board := &CommodityBoard{
-		db:  db,
-		ec:  ec,
-		mux: &sync.Mutex{},
-		ctx: ctx,
-
-		Bus: b,
-		Dev: d,
+		db:     db,
+		ec:     ec,
+		mux:    &sync.Mutex{},
+		ctx:    ctx,
+		config: config,
+		fake:   fake,
 	}
+
+	// if running on a device connect to the board, add the I2C Bus and Device
+	// to the board object
+	if !fake {
+		bus, err := i2creg.Open(string(config.BusID))
+		if err != nil {
+			return nil, err
+		}
+
+		dev := &i2c.Dev{Addr: uint16(config.Addr), Bus: bus}
+
+		// t3h board
+		board.Dev = dev
+		board.Bus = bus
+	}
+
 	return board, nil
 }
 
 // Start is used to start ... @todo
 func (b *CommodityBoard) Start() {
 
-	go b.Heartbeat(time.Second)
+	// if the board is not fake, start the board processes
+	// otherwise start some dummy routines to fill random data in db
+	if !b.fake {
+		go b.Heartbeat()
 
-	go b.SyncPower(time.Second)
-	go b.SyncEnv(time.Second)
+		go b.SyncPower()
+		go b.SyncEnv()
+	} else {
 
+	}
 	//go b.SyncIMU(time.Second / 2)
 	//go b.SyncTOF(time.Second / 2)
 	//go b.SyncWifi(time.Second * 2)
@@ -69,18 +75,27 @@ func (b *CommodityBoard) Start() {
 
 // Close is used to close ... @todo
 func (b *CommodityBoard) Close() {
-	b.Bus.Close()
+	if !b.fake {
+		_ = b.Bus.Close()
+	}
+}
+
+// IsFake returns b.fake attr
+func (b *CommodityBoard) IsFake() bool {
+	return b.fake
 }
 
 // Heartbeat shifts a bit on the board and blinks the blue led
-func (b *CommodityBoard) Heartbeat(t time.Duration) {
-	tick := time.Tick(t)
+func (b *CommodityBoard) Heartbeat() {
+	tick := time.Tick(b.config.Update.Heartbeat)
+
+	zap.S().Debugf("Heartbeat started with update rate: %v", b.config.Update.Heartbeat)
 
 	for {
 		select {
 		case <-tick:
 
-			// switch blueled
+			// switch blue led
 			err := b.SwitchLed(BlueLed)
 			if err != nil {
 				b.ec <- err

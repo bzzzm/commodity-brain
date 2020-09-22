@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 	"os"
 	"periph.io/x/periph/host"
+	"runtime"
 )
 
 type Commodity struct {
@@ -42,13 +43,19 @@ func NewCommodity(ctx context.Context, config *utils.Config, ec chan error, qc c
 		zap.S().Panicf("cannot initiate db: %v", err)
 	}
 
-	// create astar object and start a goroutine to keep the DB in sync
+	// create board object
 	boardCtx, cancel := context.WithCancel(ctx)
 	cb.Board = utils.ContextPair{
 		Context: boardCtx,
 		Cancel:  cancel,
 	}
-	cboard, err := board.NewBoard(boardCtx, database, ec)
+
+	var fake bool
+	if runtime.GOARCH != "arm" {
+		fake = true
+	}
+
+	cboard, err := board.NewBoard(boardCtx, &config.Board, database, fake, ec)
 	if err != nil {
 		zap.S().Panicf("cannot initiate board: %v", err)
 	}
@@ -61,6 +68,8 @@ func (c *Commodity) Close() {
 	c.Board.Close()
 }
 func (c *Commodity) Start() {
+
+	// start the board and keep the database in sync
 	c.Board.Start()
 }
 
