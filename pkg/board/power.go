@@ -17,15 +17,16 @@ const (
 	PowerKey   = "power_watt"
 )
 
-func (b CommodityBoard) SyncPower(t time.Duration) {
-	buf := make([]byte, PowerDataLen)
-	tick := time.Tick(t)
+func (b CommodityBoard) SyncPower() {
 
 	var err error
 	var voltage, current, power float32
 	var start time.Time
 
-	zap.S().Debugf("SyncPower started")
+	buf := make([]byte, PowerDataLen)
+	tick := time.Tick(b.config.Update.Power)
+
+	zap.S().Debugf("SyncPower started with update rate: %v", b.config.Update.Power)
 
 	for {
 		select {

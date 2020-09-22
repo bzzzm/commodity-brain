@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	fmt.Print(1)
+
 	// create config and parse options
 	cfg := utils.NewConfig()
 	err := gflag.ParseToDef(&cfg)
@@ -44,16 +44,15 @@ func main() {
 	lc.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	logger, _ := lc.Build()
 	_ = zap.ReplaceGlobals(logger)
-	zap.S().Infof("started commodity v1 on arch=%v", runtime.GOARCH)
 
 	// create commodity and watch buttons
 	c := commodity.NewCommodity(ctx, &cfg, echan, qchan)
 	defer c.Close()
 
 	// start
-	if runtime.GOARCH == "arm" {
-		c.Start()
-	}
+	c.Start()
+
+	zap.S().Infof("started commodity v1 on arch=%v", runtime.GOARCH)
 
 	// todo: initiate default program
 

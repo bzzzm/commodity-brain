@@ -14,15 +14,23 @@ type DatabaseConfig struct {
 }
 
 type HttpConfig struct {
-	Address string `desc:"HTTP address (127.0.0.1:8080)"`
+	Address string `desc:"HTTP address"`
 	SSL     bool
 	Timeout time.Duration
 }
 
 type BoardConfig struct {
-	BusID   int           `desc:"I2C Bus to use to communicate with AStar HAT"`
-	Addr    byte          `desc:"I2C Address for the AStar HAT"`
-	Refresh time.Duration `desc:"How many times per second to refresh the buffer from I2C"`
+	BusID  int               `desc:"I2C Bus to use to communicate with Commodity Board"`
+	Addr   byte              `desc:"I2C Address for the Commodity Board"`
+	Update BoardUpdateConfig `desc:"map[string]int with the refresh time of each task"`
+}
+
+type BoardUpdateConfig struct {
+	Power     time.Duration `desc:"Power sensor"`
+	Env       time.Duration `desc:"Environmental sensor"`
+	IMU       time.Duration `desc:"9 axis IMU sensor"`
+	Wifi      time.Duration `desc:"wifi scanner"`
+	Heartbeat time.Duration `desc:"Heartbeat"`
 }
 
 type CameraConfig struct {
@@ -46,16 +54,20 @@ func NewConfig() Config {
 			Timeout: 3 * time.Second,
 		},
 		Board: BoardConfig{
-			BusID:   1,
-			Addr:    0x14,
-			Refresh: 50,
+			BusID: 1,
+			Addr:  0x20,
+			Update: BoardUpdateConfig{
+				Power:     time.Second,
+				Env:       time.Second * 3,
+				Heartbeat: time.Second,
+			},
 		},
 		Camera: CameraConfig{
 			CameraID: 0,
 			Width:    640,
 			Height:   480,
 			VFlip:    true,
-			HFlip:    true,
+			HFlip:    false,
 			SaveDir:  "/data/camera",
 		},
 	}

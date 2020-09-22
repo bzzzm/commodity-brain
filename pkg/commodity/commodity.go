@@ -3,23 +3,25 @@ package commodity
 import (
 	"context"
 	"github.com/bzzzm/commodity-brain/pkg/board"
+	"github.com/bzzzm/commodity-brain/pkg/camera"
 	"github.com/bzzzm/commodity-brain/pkg/db"
+	"github.com/bzzzm/commodity-brain/pkg/http"
 	"github.com/bzzzm/commodity-brain/pkg/utils"
 	"go.etcd.io/bbolt"
 	"go.uber.org/zap"
 	"os"
 	"periph.io/x/periph/host"
+	"runtime"
 )
 
 type Commodity struct {
-	Board      *board.CommodityBoard
 	Db         *bbolt.DB
+	Board      *board.CommodityBoard
+	Camera     *camera.OpenCVCapture
+	Stream     *http.MJPEGStream
+	HTTP       *http.HTTPServer
 	Config     *utils.Config
 	ContextBag *utils.ContextBag
-
-	//Camera     cc.OpenCVCapture
-	//Stream     cc.MJPEGStream
-	//HTTP       http.HTTPServer
 
 	ctx context.Context
 	ec  chan error
@@ -42,18 +44,62 @@ func NewCommodity(ctx context.Context, config *utils.Config, ec chan error, qc c
 		zap.S().Panicf("cannot initiate db: %v", err)
 	}
 
-	// create astar object and start a goroutine to keep the DB in sync
+	// create board object
 	boardCtx, cancel := context.WithCancel(ctx)
 	cb.Board = utils.ContextPair{
 		Context: boardCtx,
 		Cancel:  cancel,
 	}
-	cboard, err := board.NewBoard(boardCtx, database, ec)
+
+	var fake bool
+	if runtime.GOARCH != "arm" {
+		fake = true
+		zap.S().Debugf("starting board in fake mode, arch=%v", runtime.GOARCH)
+	}
+
+	cboard, err := board.NewBoard(boardCtx, &config.Board, database, fake, ec)
 	if err != nil {
 		zap.S().Panicf("cannot initiate board: %v", err)
 	}
 
-	return &Commodity{cboard, database, config, cb, ctx, ec}
+	// create the camera capture
+	captureCtx, cancel := context.WithCancel(ctx)
+	cb.Camera = utils.ContextPair{
+		Context: captureCtx,
+		Cancel:  cancel,
+	}
+	ic := make(chan camera.CaptureImage, 5)
+	cam, err := camera.NewCapture(captureCtx, config.Camera, ic)
+	if err != nil {
+		zap.S().Panicf("cannot start capture: %v", err)
+	}
+
+	// create mjpeg stream
+	streamCtx, cancel := context.WithCancel(ctx)
+	cb.Stream = utils.ContextPair{
+		Context: streamCtx,
+		Cancel:  cancel,
+	}
+	stream := http.NewStream(streamCtx, ic)
+
+	// http server
+	httpCtx, cancel := context.WithCancel(ctx)
+	cb.HTTP = utils.ContextPair{
+		Context: httpCtx,
+		Cancel:  cancel,
+	}
+	httpd := http.NewHTTPServer(httpCtx, stream, config.HTTP)
+
+	return &Commodity{
+		Db:         database,
+		Board:      cboard,
+		Camera:     cam,
+		Stream:     stream,
+		HTTP:       httpd,
+		Config:     config,
+		ContextBag: cb,
+		ec:         ec,
+	}
 
 }
 
@@ -61,7 +107,18 @@ func (c *Commodity) Close() {
 	c.Board.Close()
 }
 func (c *Commodity) Start() {
-	c.Board.Start()
+
+	// start the board and keep the database in sync
+	go c.Board.Start()
+
+	// Start video capturing
+	go c.Camera.Start()
+
+	// Start MJPEG stream
+	go c.Stream.Start()
+
+	// Start HTTP Server
+	go c.HTTP.Start()
 }
 
 //
