@@ -50,9 +50,8 @@ func main() {
 	defer c.Close()
 
 	// start
-	if runtime.GOARCH == "arm" {
-		c.Start()
-	}
+	c.Start()
+
 	zap.S().Infof("started commodity v1 on arch=%v", runtime.GOARCH)
 
 	// todo: initiate default program

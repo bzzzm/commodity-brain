@@ -113,29 +113,19 @@ func (c *OpenCVCapture) Start() {
 				continue
 			}
 
+			// if flip is required
+			if c.config.VFlip {
+				gocv.Flip(frame, &flipMat, -1)
+			}
+			if c.config.HFlip {
+				gocv.Flip(frame, &flipMat, 1)
+			}
+
 			// create the default capturedImage
 			capturedImage := CaptureImage{
 				Mat:     frame,
 				Time:    startTime,
 				FrameId: frameId,
-			}
-
-			// if flip is required
-			if c.config.VFlip && c.config.HFlip {
-				if c.config.VFlip {
-					gocv.Flip(frame, &flipMat, -1)
-					capturedImage.Mat = flipMat
-				}
-			} else {
-				if c.config.VFlip {
-					gocv.Flip(frame, &flipMat, 0)
-					capturedImage.Mat = flipMat
-				}
-
-				if c.config.HFlip {
-					gocv.Flip(frame, &flipMat, 1)
-					capturedImage.Mat = flipMat
-				}
 			}
 
 			c.ImageChannel <- capturedImage

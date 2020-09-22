@@ -46,7 +46,6 @@ func (s *MJPEGStream) Start() {
 			zap.S().Debug("closing camera stream")
 			return
 		case img := <-s.ic:
-
 			buf, err := gocv.IMEncode(gocv.JPEGFileExt, img.Mat)
 			if err != nil {
 				zap.S().Errorf("cannot encode stream frame: %v", err)

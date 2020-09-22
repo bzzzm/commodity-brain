@@ -54,6 +54,7 @@ func NewCommodity(ctx context.Context, config *utils.Config, ec chan error, qc c
 	var fake bool
 	if runtime.GOARCH != "arm" {
 		fake = true
+		zap.S().Debugf("starting board in fake mode, arch=%v", runtime.GOARCH)
 	}
 
 	cboard, err := board.NewBoard(boardCtx, &config.Board, database, fake, ec)
@@ -108,7 +109,16 @@ func (c *Commodity) Close() {
 func (c *Commodity) Start() {
 
 	// start the board and keep the database in sync
-	c.Board.Start()
+	go c.Board.Start()
+
+	// Start video capturing
+	go c.Camera.Start()
+
+	// Start MJPEG stream
+	go c.Stream.Start()
+
+	// Start HTTP Server
+	go c.HTTP.Start()
 }
 
 //

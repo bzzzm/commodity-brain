@@ -2,19 +2,18 @@ package http
 
 import (
 	"context"
-	"github.com/bzzzm/commodity-brain/pkg/camera"
 	"github.com/bzzzm/commodity-brain/pkg/utils"
 	"go.uber.org/zap"
 	"net/http"
 )
 
 type HTTPServer struct {
-	Stream *camera.MJPEGStream
+	Stream *MJPEGStream
 	config utils.HttpConfig
 	ctx    context.Context
 }
 
-func NewHTTPServer(ctx context.Context, stream *camera.MJPEGStream, config utils.HttpConfig) *HTTPServer {
+func NewHTTPServer(ctx context.Context, stream *MJPEGStream, config utils.HttpConfig) *HTTPServer {
 	return &HTTPServer{
 		Stream: stream,
 		config: config,

@@ -67,7 +67,7 @@ func NewConfig() Config {
 			Width:    640,
 			Height:   480,
 			VFlip:    true,
-			HFlip:    true,
+			HFlip:    false,
 			SaveDir:  "/data/camera",
 		},
 	}

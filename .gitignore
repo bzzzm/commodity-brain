@@ -19,3 +19,6 @@ vendor/
 
 # Development DB
 *.db
+
+# WIP
+Makefile
